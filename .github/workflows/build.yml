@@ -24,46 +24,37 @@ jobs:
           cat << 'EOF' > www/bio-bridge.js
           (function() {
             const callNativeBiometric = async (reasonText) => {
-              // الانتظار لمدة قصيرة في حال كان الجسر لا يزال يتهيأ
-              for (let i = 0; i < 15; i++) {
-                if (window.Capacitor) break;
-                await new Promise(r => setTimeout(r, 100));
-              }
               if (!window.Capacitor) {
-                throw new Error('لم يتم العثور على بيئة التطبيق (Capacitor)');
+                throw new Error('بيئة التطبيق غير جاهزة');
               }
-
-              // البحث عن الإضافة في الكائنات المحملة
-              let plugin = window.Capacitor.Plugins && window.Capacitor.Plugins.BiometricAuth;
-              
-              // محاولة استدعائها عبر جسر Capacitor المباشر إذا لم تكن في Plugins
-              if (!plugin && window.Capacitor.nativePromise) {
-                return await window.Capacitor.nativePromise('BiometricAuth', 'authenticate', {
-                  reason: reasonText,
-                  cancelTitle: 'إلغاء',
-                  allowDeviceCredential: true
-                });
-              }
-
-              if (!plugin && window.Capacitor.registerPlugin) {
-                plugin = window.Capacitor.registerPlugin('BiometricAuth');
-              }
+              const plugins = window.Capacitor.Plugins || {};
+              const bioKey = Object.keys(plugins).find(k => k.toLowerCase().includes('biometric'));
+              const plugin = bioKey ? plugins[bioKey] : (window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin('NativeBiometric') : null);
 
               if (!plugin) {
-                throw new Error('إضافة البصمة غير مثبتة في حزمة الأندرويد');
+                throw new Error('الإضافات المتاحة فقط: ' + Object.keys(plugins).join(', '));
               }
 
-              return await plugin.authenticate({
-                reason: reasonText,
-                cancelTitle: 'إلغاء',
-                allowDeviceCredential: true
-              });
+              if (plugin.verifyIdentity) {
+                return await plugin.verifyIdentity({
+                  reason: reasonText,
+                  title: 'التحقق بالبصمة',
+                  subtitle: 'SME Agri',
+                  description: reasonText
+                });
+              } else if (plugin.authenticate) {
+                return await plugin.authenticate({
+                  reason: reasonText,
+                  cancelTitle: 'إلغاء'
+                });
+              }
+              throw new Error('دالة التحقق غير موجودة في الإضافة');
             };
 
             const bridge = {
               create: async (opts) => {
                 await callNativeBiometric('تسجيل بصمة العامل');
-                const fakeId = new Uint8Array([1, 2, 3, 4]);
+                const fakeId = new Uint8Array();
                 return {
                   id: 'cap-bio-' + Date.now(),
                   rawId: fakeId.buffer,
@@ -77,7 +68,7 @@ jobs:
               },
               get: async (opts) => {
                 await callNativeBiometric('تأكيد الحضور والانصراف بالبصمة');
-                const fakeId = new Uint8Array([1, 2, 3, 4]);
+                const fakeId = new Uint8Array();
                 return {
                   id: 'cap-bio-auth',
                   rawId: fakeId.buffer,
