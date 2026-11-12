@@ -17,11 +17,10 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Prepare Web Assets and Modules
+      - name: Prepare Web Assets and Bridges
         run: |
           mkdir -p www
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
-
           cat << 'EOF' > www/bio-bridge.js
           (function() {
             const callNativeBiometric = async (reasonText) => {
@@ -29,7 +28,7 @@ jobs:
               const plugins = window.Capacitor.Plugins || {};
               const bioKey = Object.keys(plugins).find(k => k.toLowerCase().includes('biometric'));
               const plugin = bioKey ? plugins[bioKey] : (window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin('NativeBiometric') : null);
-              if (!plugin) throw new Error('الإضافات المتاحة فقط: ' + Object.keys(plugins).join(', '));
+              if (!plugin) throw new Error('الإضافات المتاحة: ' + Object.keys(plugins).join(', '));
               if (plugin.verifyIdentity) {
                 return await plugin.verifyIdentity({ reason: reasonText, title: 'التحقق بالبصمة', subtitle: 'SME Agri', description: reasonText });
               } else if (plugin.authenticate) {
@@ -37,7 +36,6 @@ jobs:
               }
               throw new Error('دالة التحقق غير موجودة');
             };
-
             const bridge = {
               create: async (opts) => {
                 await callNativeBiometric('تسجيل بصمة العامل');
@@ -53,25 +51,18 @@ jobs:
             if (!window.PublicKeyCredential) { window.PublicKeyCredential = function(){}; }
             window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = async () => true;
             try { Object.defineProperty(navigator, 'credentials', { value: bridge, configurable: true }); } catch(e) { navigator.credentials = bridge; }
-
             window.saveNativeBase64File = async (base64Data, cleanName) => {
               try {
                 const fs = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
                 if (!fs) return false;
-                await fs.writeFile({
-                  path: cleanName,
-                  data: base64Data,
-                  directory: 'DOCUMENTS',
-                  recursive: true
-                });
-                alert('✅ تم حفظ الملف بنجاح في مجلد المستندات (Documents):\n' + cleanName);
+                await fs.writeFile({ path: cleanName, data: base64Data, directory: 'DOCUMENTS', recursive: true });
+                alert('✅ تم حفظ الملف بنجاح في مجلد المستندات:\n' + cleanName);
                 return true;
               } catch (err) {
                 alert('⚠️ تعذر حفظ الملف: ' + err.message);
                 return false;
               }
             };
-
             const saveNativeFile = async (url, filename) => {
               try {
                 const res = await fetch(url);
@@ -87,7 +78,6 @@ jobs:
                 return false;
               }
             };
-
             document.addEventListener('click', (e) => {
               const a = e.target.closest('a');
               if (a && a.href && (a.hasAttribute('download') || a.href.startsWith('blob:') || a.href.startsWith('data:'))) {
@@ -97,106 +87,30 @@ jobs:
             }, true);
           })();
           EOF
-
-          cat << 'EOF' > www/invoicing-module.js
-          (function() {
-            window.addEventListener('DOMContentLoaded', () => {
-              let currentLang = 'ar';
-              const texts = {
-                ar: {
-                  dir: 'rtl',
-                  btnFloat: '🧾 الفوترة',
-                  title: '🧾 إنشاء وتصدير فاتورة',
-                  langSwitch: 'Français 🇫🇷',
-                  compAddrPh: 'العنوان (كرمسين، ولاية اترارزة، موريتانيا)',
-                  compPhonePh: 'هاتف الشركة / السجل التجاري',
-                  defaultAddr: 'كرمسين، ولاية اترارزة - موريتانيا',
-                  clientLabel: 'اسم العميل / المشتري:',
-                  clientPh: 'مثال: شركة التوريد الزراعي',
-                  defaultClient: 'عميل نقدي',
-                  invNumLabel: 'رقم الفاتورة:',
-                  dateLabel: 'التاريخ:',
-                  addItemTitle: 'إضافة صنف / محصول:',
-                  itemNamePh: 'اسم المحصول (مثال: بطيخ أحمر)',
-                  itemQtyPh: 'الكمية',
-                  itemPricePh: 'السعر',
-                  addBtn: '+ إضافة',
-                  thItem: 'الصنف',
-                  thQty: 'الكمية',
-                  thPrice: 'السعر',
-                  thSub: 'المجموع',
-                  totalLabel: 'الإجمالي الكلي:',
-                  exportBtn: '📄 تصدير وحفظ الفاتورة (PDF)',
-                  errInput: 'يرجى إدخال اسم الصنف والكمية والسعر بشكل صحيح',
-                  errEmpty: 'أضف صنفاً واحداً على الأقل قبل التصدير',
-                  pdfSubtitle: 'الإنتاج الزراعي والتسويق - كرمسين، موريتانيا',
-                  pdfBillTo: 'فاتورة إلى:',
-                  pdfInvNo: 'رقم الفاتورة:',
-                  pdfDate: 'التاريخ:',
-                  pdfThDesc: 'البيان / الصنف',
-                  pdfThUnit: 'سعر الوحدة',
-                  pdfTotalDue: 'المبلغ الإجمالي المستحق:',
-                  pdfSign: 'توقيع وختم الإدارة',
-                  pdfFooter: 'SME Agri - Société Moulay Ely Pour Agricol | شكراً لتعاملكم معنا'
-                },
-                fr: {
-                  dir: 'ltr',
-                  btnFloat: '🧾 Facturation',
-                  title: '🧾 Créer et Exporter Facture',
-                  langSwitch: 'العربية 🇸🇦',
-                  compAddrPh: 'Adresse (Keur Macène, Trarza, Mauritanie)',
-                  compPhonePh: 'Téléphone / NIF / RC',
-                  defaultAddr: 'Keur Macène, Wilaya du Trarza - Mauritanie',
-                  clientLabel: 'Nom du Client / Acheteur :',
-                  clientPh: 'Ex: Société Agro Distribution',
-                  defaultClient: 'Client Comptant',
-                  invNumLabel: 'N° de Facture :',
-                  dateLabel: 'Date :',
-                  addItemTitle: 'Ajouter un Produit / Récolte :',
-                  itemNamePh: 'Nom du produit (Ex: Pastèque)',
-                  itemQtyPh: 'Quantité',
-                  itemPricePh: 'Prix Unitaire',
-                  addBtn: '+ Ajouter',
-                  thItem: 'Désignation',
-                  thQty: 'Qté',
-                  thPrice: 'P.U',
-                  thSub: 'Total',
-                  totalLabel: 'Total Général :',
-                  exportBtn: '📄 Exporter la Facture (PDF)',
-                  errInput: 'Veuillez saisir le produit, la quantité et le prix',
-                  errEmpty: 'Veuillez ajouter au moins un article avant d’exporter',
-                  pdfSubtitle: 'Production et Commercialisation Agricole - Keur Macène, Mauritanie',
-                  pdfBillTo: 'Facturé à :',
-                  pdfInvNo: 'Facture N° :',
-                  pdfDate: 'Date :',
-                  pdfThDesc: 'Désignation / Produit',
-                  pdfThUnit: 'Prix Unitaire',
-                  pdfTotalDue: 'Montant Total à Payer :',
-                  pdfSign: 'Cachet et Signature de la Direction',
-                  pdfFooter: 'SME Agri - Société Moulay Ely Pour Agricol | Merci de votre confiance'
-                }
-              };
-
-              const invBtn = document.createElement('button');
-              invBtn.innerHTML = texts.ar.btnFloat;
-              invBtn.style.cssText = 'position:fixed; bottom:78px; left:16px; z-index:9998; background:#d97706; color:#fff; border:none; border-radius:25px; padding:10px 18px; font-weight:bold; font-size:14px; box-shadow:0 4px 12px rgba(0,0,0,0.25); cursor:pointer; font-family:inherit;';
-              document.body.appendChild(invBtn);
-
-              const modal = document.createElement('div');
-              modal.style.cssText = 'display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; overflow-y:auto; padding:16px;';
-              document.body.appendChild(modal);
-
-              let items = [];
-              let savedClient = '';
-              let savedCompAddr = localStorage.getItem('sme_comp_addr') || '';
-              let savedCompPhone = localStorage.getItem('sme_comp_phone') || '';
-              let savedInvNum = 'INV-' + Math.floor(1000 + Math.random()*9000);
-              let savedDate = new Date().toISOString().split('T')[0];
-
-              const renderModal = () => {
-                const t = texts[currentLang];
-                const alignStart = t.dir === 'rtl' ? 'right' : 'left';
-                const alignEnd = t.dir === 'rtl' ? 'left' : 'right';
-
-                modal.style.direction = t.dir;
-                modal.innerHTML = `
+          sed -i 's/<\/body>/<script src="bio-bridge.js"><\/script><\/body>/' www/index.html
+      - name: Install Capacitor and Add Android
+        run: |
+          npm install --legacy-peer-deps
+          npx cap add android
+          npx cap sync
+      - name: Set App Icon and Permissions
+        run: |
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26
+          for dir in android/app/src/main/res/mipmap-*; do
+            if [ -d "$dir" ] && [ -f "icon-512.png" ]; then
+              cp icon-512.png "$dir/ic_launcher.png"
+              cp icon-512.png "$dir/ic_launcher_round.png"
+              cp icon-512.png "$dir/ic_launcher_foreground.png"
+            fi
+          done
+          sed -i 's/<uses-permission android:name="android.permission.INTERNET" \/>/<uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-permission android:name="android.permission.USE_BIOMETRIC" \/>\n    <uses-permission android:name="android.permission.USE_FINGERPRINT" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" \/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>/' android/app/src/main/AndroidManifest.xml
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SME-Agri-App
+          path: android/app/build/outputs/apk/debug/app-debug.apk
