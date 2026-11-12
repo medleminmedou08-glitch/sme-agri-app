@@ -1,6 +1,6 @@
 {
   "appId": "com.sme.agri",
   "appName": "SME Agri",
-  "webDir": "sme-agri-web",
+  "webDir": ".",
   "bundledWebRuntime": false
 }
