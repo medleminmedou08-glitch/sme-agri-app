@@ -17,13 +17,10 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Prepare Web Assets, Logo and Biometrics Bridge
+      - name: Prepare Web Assets and Biometrics Bridge
         run: |
-          mkdir -p www assets
+          mkdir -p www
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
-          cp icon-512.png assets/icon-only.png 2>/dev/null || true
-          cp icon-512.png assets/icon-foreground.png 2>/dev/null || true
-          cp icon-512.png assets/splash.png 2>/dev/null || true
           cat << 'EOF' > www/bio-bridge.js
           (function() {
             const bridge = {
@@ -48,14 +45,21 @@ jobs:
           })();
           EOF
           sed -i 's/<head>/<head><script src="bio-bridge.js"><\/script>/' www/index.html
-      - name: Install Capacitor and Generate Icons
+      - name: Install Capacitor and Add Android
         run: |
           npm install --legacy-peer-deps
           npx cap add android
-          npx -y @capacitor/assets generate --android --iconBackgroundColor '#1a3622' --splashBackgroundColor '#1a3622' || true
           npx cap sync
-      - name: Add Permissions to AndroidManifest
+      - name: Set App Icon and Permissions
         run: |
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26
+          for dir in android/app/src/main/res/mipmap-*; do
+            if [ -d "$dir" ] && [ -f "icon-512.png" ]; then
+              cp icon-512.png "$dir/ic_launcher.png"
+              cp icon-512.png "$dir/ic_launcher_round.png"
+              cp icon-512.png "$dir/ic_launcher_foreground.png"
+            fi
+          done
           sed -i 's/<uses-permission android:name="android.permission.INTERNET" \/>/<uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-permission android:name="android.permission.USE_BIOMETRIC" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/>/' android/app/src/main/AndroidManifest.xml
       - name: Build APK
         run: |
