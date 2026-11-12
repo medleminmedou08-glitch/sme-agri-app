@@ -23,23 +23,37 @@ jobs:
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
           cat << 'EOF' > www/bio-bridge.js
           (function() {
-            const getBioPlugin = () => {
-              if (!window.Capacitor) return null;
-              if (window.Capacitor.Plugins && window.Capacitor.Plugins.BiometricAuth) {
-                return window.Capacitor.Plugins.BiometricAuth;
+            const callNativeBiometric = async (reasonText) => {
+              // الانتظار لمدة قصيرة في حال كان الجسر لا يزال يتهيأ
+              for (let i = 0; i < 15; i++) {
+                if (window.Capacitor) break;
+                await new Promise(r => setTimeout(r, 100));
               }
-              if (window.Capacitor.registerPlugin) {
-                return window.Capacitor.registerPlugin('BiometricAuth');
+              if (!window.Capacitor) {
+                throw new Error('لم يتم العثور على بيئة التطبيق (Capacitor)');
               }
-              return null;
-            };
 
-            const triggerAuth = async (reasonText) => {
-              const plugin = getBioPlugin();
-              if (!plugin) {
-                throw new Error('إضافة البصمة غير جاهزة بعد');
+              // البحث عن الإضافة في الكائنات المحملة
+              let plugin = window.Capacitor.Plugins && window.Capacitor.Plugins.BiometricAuth;
+              
+              // محاولة استدعائها عبر جسر Capacitor المباشر إذا لم تكن في Plugins
+              if (!plugin && window.Capacitor.nativePromise) {
+                return await window.Capacitor.nativePromise('BiometricAuth', 'authenticate', {
+                  reason: reasonText,
+                  cancelTitle: 'إلغاء',
+                  allowDeviceCredential: true
+                });
               }
-              await plugin.authenticate({
+
+              if (!plugin && window.Capacitor.registerPlugin) {
+                plugin = window.Capacitor.registerPlugin('BiometricAuth');
+              }
+
+              if (!plugin) {
+                throw new Error('إضافة البصمة غير مثبتة في حزمة الأندرويد');
+              }
+
+              return await plugin.authenticate({
                 reason: reasonText,
                 cancelTitle: 'إلغاء',
                 allowDeviceCredential: true
@@ -48,8 +62,8 @@ jobs:
 
             const bridge = {
               create: async (opts) => {
-                await triggerAuth('تسجيل بصمة العامل');
-                const fakeId = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+                await callNativeBiometric('تسجيل بصمة العامل');
+                const fakeId = new Uint8Array([1, 2, 3, 4]);
                 return {
                   id: 'cap-bio-' + Date.now(),
                   rawId: fakeId.buffer,
@@ -62,8 +76,8 @@ jobs:
                 };
               },
               get: async (opts) => {
-                await triggerAuth('تأكيد الحضور والانصراف بالبصمة');
-                const fakeId = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+                await callNativeBiometric('تأكيد الحضور والانصراف بالبصمة');
+                const fakeId = new Uint8Array([1, 2, 3, 4]);
                 return {
                   id: 'cap-bio-auth',
                   rawId: fakeId.buffer,
@@ -87,7 +101,7 @@ jobs:
             }
           })();
           EOF
-          sed -i 's/<head>/<head><script src="bio-bridge.js"><\/script>/' www/index.html
+          sed -i 's/<\/body>/<script src="bio-bridge.js"><\/script><\/body>/' www/index.html
       - name: Install Capacitor and Add Android
         run: |
           npm install --legacy-peer-deps
