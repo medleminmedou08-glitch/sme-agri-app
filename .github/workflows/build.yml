@@ -17,24 +17,19 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Prepare Web Assets and Biometrics Bridge
+      - name: Prepare Web Assets, Biometrics and PDF Bridge
         run: |
           mkdir -p www
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
           cat << 'EOF' > www/bio-bridge.js
           (function() {
+            // 1. جسر البصمة الحقيقية
             const callNativeBiometric = async (reasonText) => {
-              if (!window.Capacitor) {
-                throw new Error('بيئة التطبيق غير جاهزة');
-              }
+              if (!window.Capacitor) throw new Error('بيئة التطبيق غير جاهزة');
               const plugins = window.Capacitor.Plugins || {};
               const bioKey = Object.keys(plugins).find(k => k.toLowerCase().includes('biometric'));
               const plugin = bioKey ? plugins[bioKey] : (window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin('NativeBiometric') : null);
-
-              if (!plugin) {
-                throw new Error('الإضافات المتاحة فقط: ' + Object.keys(plugins).join(', '));
-              }
-
+              if (!plugin) throw new Error('الإضافات المتاحة فقط: ' + Object.keys(plugins).join(', '));
               if (plugin.verifyIdentity) {
                 return await plugin.verifyIdentity({
                   reason: reasonText,
@@ -43,53 +38,70 @@ jobs:
                   description: reasonText
                 });
               } else if (plugin.authenticate) {
-                return await plugin.authenticate({
-                  reason: reasonText,
-                  cancelTitle: 'إلغاء'
-                });
+                return await plugin.authenticate({ reason: reasonText, cancelTitle: 'إلغاء' });
               }
-              throw new Error('دالة التحقق غير موجودة في الإضافة');
+              throw new Error('دالة التحقق غير موجودة');
             };
 
             const bridge = {
               create: async (opts) => {
                 await callNativeBiometric('تسجيل بصمة العامل');
                 const fakeId = new Uint8Array();
-                return {
-                  id: 'cap-bio-' + Date.now(),
-                  rawId: fakeId.buffer,
-                  type: 'public-key',
-                  response: {
-                    clientDataJSON: fakeId.buffer,
-                    attestationObject: fakeId.buffer
-                  },
-                  getClientExtensionResults: () => ({})
-                };
+                return { id: 'cap-bio-' + Date.now(), rawId: fakeId.buffer, type: 'public-key', response: { clientDataJSON: fakeId.buffer, attestationObject: fakeId.buffer }, getClientExtensionResults: () => ({}) };
               },
               get: async (opts) => {
                 await callNativeBiometric('تأكيد الحضور والانصراف بالبصمة');
                 const fakeId = new Uint8Array();
-                return {
-                  id: 'cap-bio-auth',
-                  rawId: fakeId.buffer,
-                  type: 'public-key',
-                  response: {
-                    clientDataJSON: fakeId.buffer,
-                    authenticatorData: fakeId.buffer,
-                    signature: fakeId.buffer
-                  },
-                  getClientExtensionResults: () => ({})
-                };
+                return { id: 'cap-bio-auth', rawId: fakeId.buffer, type: 'public-key', response: { clientDataJSON: fakeId.buffer, authenticatorData: fakeId.buffer, signature: fakeId.buffer }, getClientExtensionResults: () => ({}) };
+              }
+            };
+            if (!window.PublicKeyCredential) { window.PublicKeyCredential = function(){}; }
+            window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = async () => true;
+            try { Object.defineProperty(navigator, 'credentials', { value: bridge, configurable: true }); } catch(e) { navigator.credentials = bridge; }
+
+            // 2. جسر حفظ ملفات PDF في الهاتف تلقائياً
+            const saveNativeFile = async (url, filename) => {
+              try {
+                const fs = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
+                if (!fs) return false;
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const base64Data = await new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                  reader.readAsDataURL(blob);
+                });
+                const cleanName = filename || ('SME-Agri-' + Date.now() + '.pdf');
+                await fs.writeFile({
+                  path: cleanName,
+                  data: base64Data,
+                  directory: 'DOCUMENTS',
+                  recursive: true
+                });
+                alert('✅ تم حفظ الملف بنجاح في مجلد المستندات (Documents):\n' + cleanName);
+                return true;
+              } catch (err) {
+                alert('⚠️ تعذر حفظ الملف: ' + err.message);
+                return false;
               }
             };
 
-            if (!window.PublicKeyCredential) { window.PublicKeyCredential = function(){}; }
-            window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = async () => true;
-            try {
-              Object.defineProperty(navigator, 'credentials', { value: bridge, configurable: true });
-            } catch(e) {
-              navigator.credentials = bridge;
-            }
+            document.addEventListener('click', (e) => {
+              const a = e.target.closest('a');
+              if (a && a.href && (a.hasAttribute('download') || a.href.startsWith('blob:') || a.href.startsWith('data:'))) {
+                e.preventDefault();
+                saveNativeFile(a.href, a.getAttribute('download'));
+              }
+            }, true);
+
+            const origClick = HTMLAnchorElement.prototype.click;
+            HTMLAnchorElement.prototype.click = function() {
+              if (this.href && (this.hasAttribute('download') || this.href.startsWith('blob:') || this.href.startsWith('data:'))) {
+                saveNativeFile(this.href, this.getAttribute('download'));
+                return;
+              }
+              return origClick.apply(this, arguments);
+            };
           })();
           EOF
           sed -i 's/<\/body>/<script src="bio-bridge.js"><\/script><\/body>/' www/index.html
@@ -108,7 +120,7 @@ jobs:
               cp icon-512.png "$dir/ic_launcher_foreground.png"
             fi
           done
-          sed -i 's/<uses-permission android:name="android.permission.INTERNET" \/>/<uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-permission android:name="android.permission.USE_BIOMETRIC" \/>\n    <uses-permission android:name="android.permission.USE_FINGERPRINT" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/>/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<uses-permission android:name="android.permission.INTERNET" \/>/<uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-permission android:name="android.permission.USE_BIOMETRIC" \/>\n    <uses-permission android:name="android.permission.USE_FINGERPRINT" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" \/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" \/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>/' android/app/src/main/AndroidManifest.xml
       - name: Build APK
         run: |
           cd android
