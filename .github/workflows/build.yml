@@ -17,14 +17,18 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Prepare Web Assets
+      - name: Prepare Web Assets and Logo
         run: |
-          mkdir -p www
+          mkdir -p www assets
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
-      - name: Install Capacitor and Plugins
+          cp icon-512.png assets/icon-only.png 2>/dev/null || true
+          cp icon-512.png assets/icon-foreground.png 2>/dev/null || true
+          cp icon-512.png assets/splash.png 2>/dev/null || true
+      - name: Install Capacitor and Generate Icons
         run: |
           npm install
           npx cap add android
+          npx capacitor-assets generate --android --iconBackgroundColor '#1a3622' --splashBackgroundColor '#1a3622' || true
           npx cap sync
       - name: Add Permissions to AndroidManifest
         run: |
