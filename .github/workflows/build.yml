@@ -30,14 +30,14 @@ jobs:
               create: async (opts) => {
                 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BiometricAuth) {
                   await window.Capacitor.Plugins.BiometricAuth.authenticate({ reason: 'تسجيل بصمة العامل' });
-                  return { id: 'cap-bio-' + Date.now(), rawId: new Uint8Array([1,2,3,4]).buffer, type: 'public-key', response: {} };
+                  return { id: 'cap-bio-' + Date.now(), rawId: new Uint8Array().buffer, type: 'public-key', response: {} };
                 }
                 throw new Error('Not supported');
               },
               get: async (opts) => {
                 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BiometricAuth) {
                   await window.Capacitor.Plugins.BiometricAuth.authenticate({ reason: 'تأكيد الحضور والانصراف بالبصمة' });
-                  return { id: 'cap-bio-auth', rawId: new Uint8Array([1,2,3,4]).buffer, type: 'public-key', response: {} };
+                  return { id: 'cap-bio-auth', rawId: new Uint8Array().buffer, type: 'public-key', response: {} };
                 }
                 throw new Error('Not supported');
               }
@@ -50,9 +50,9 @@ jobs:
           sed -i 's/<head>/<head><script src="bio-bridge.js"><\/script>/' www/index.html
       - name: Install Capacitor and Generate Icons
         run: |
-          npm install
+          npm install --legacy-peer-deps
           npx cap add android
-          npx capacitor-assets generate --android --iconBackgroundColor '#1a3622' --splashBackgroundColor '#1a3622' || true
+          npx -y @capacitor/assets generate --android --iconBackgroundColor '#1a3622' --splashBackgroundColor '#1a3622' || true
           npx cap sync
       - name: Add Permissions to AndroidManifest
         run: |
