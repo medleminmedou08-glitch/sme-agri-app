@@ -17,7 +17,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Prepare Web Assets, Biometrics, PDF and Bilingual Invoicing
+      - name: Prepare Web Assets, Biometrics, PDF and Company Invoicing
         run: |
           mkdir -p www
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
@@ -99,7 +99,7 @@ jobs:
           })();
           EOF
 
-          # 2. وحدة الفوترة ثنائية اللغة (عربي / فرنسي) وتصدير PDF
+          # 2. وحدة الفوترة ثنائية اللغة مع معلومات الشركة الكاملة
           cat << 'EOF' > www/invoicing-module.js
           (function() {
             window.addEventListener('DOMContentLoaded', () => {
@@ -110,6 +110,10 @@ jobs:
                   btnFloat: '🧾 الفوترة',
                   title: '🧾 إنشاء وتصدير فاتورة',
                   langSwitch: 'Français 🇫🇷',
+                  compInfoTitle: 'بيانات الشركة في الفاتورة:',
+                  compAddrPh: 'العنوان (مثال: كرمسين، ولاية اترارزة، موريتانيا)',
+                  compPhonePh: 'هاتف الشركة / السجل التجاري',
+                  defaultAddr: 'كرمسين، ولاية اترارزة - موريتانيا',
                   clientLabel: 'اسم العميل / المشتري:',
                   clientPh: 'مثال: شركة التوريد الزراعي',
                   defaultClient: 'عميل نقدي',
@@ -128,19 +132,25 @@ jobs:
                   exportBtn: '📄 تصدير وحفظ الفاتورة (PDF)',
                   errInput: 'يرجى إدخال اسم الصنف والكمية والسعر بشكل صحيح',
                   errEmpty: 'أضف صنفاً واحداً على الأقل قبل التصدير',
-                  pdfSubtitle: 'نظام إدارة المزارع والمبيعات',
+                  pdfSubtitle: 'الإنتاج الزراعي والتسويق - كرمسين، موريتانيا',
                   pdfBillTo: 'فاتورة إلى:',
                   pdfInvNo: 'رقم الفاتورة:',
                   pdfDate: 'التاريخ:',
                   pdfThDesc: 'البيان / الصنف',
                   pdfThUnit: 'سعر الوحدة',
-                  pdfTotalDue: 'المبلغ الإجمالي المستحق:'
+                  pdfTotalDue: 'المبلغ الإجمالي المستحق:',
+                  pdfSign: 'توقيع وختم الإدارة',
+                  pdfFooter: 'SME Agri - Société Moulay Ely Pour Agricol | شكراً لتعاملكم معنا'
                 },
                 fr: {
                   dir: 'ltr',
                   btnFloat: '🧾 Facturation',
                   title: '🧾 Créer et Exporter Facture',
                   langSwitch: 'العربية 🇸🇦',
+                  compInfoTitle: 'Informations de l’entreprise :',
+                  compAddrPh: 'Adresse (Ex: Keur Macène, Trarza, Mauritanie)',
+                  compPhonePh: 'Téléphone / NIF / RC',
+                  defaultAddr: 'Keur Macène, Wilaya du Trarza - Mauritanie',
                   clientLabel: 'Nom du Client / Acheteur :',
                   clientPh: 'Ex: Société Agro Distribution',
                   defaultClient: 'Client Comptant',
@@ -159,13 +169,15 @@ jobs:
                   exportBtn: '📄 Exporter la Facture (PDF)',
                   errInput: 'Veuillez saisir le produit, la quantité et le prix',
                   errEmpty: 'Veuillez ajouter au moins un article avant d’exporter',
-                  pdfSubtitle: 'Système de Gestion Agricole et des Ventes',
+                  pdfSubtitle: 'Production et Commercialisation Agricole - Keur Macène, Mauritanie',
                   pdfBillTo: 'Facturé à :',
                   pdfInvNo: 'Facture N° :',
                   pdfDate: 'Date :',
                   pdfThDesc: 'Désignation / Produit',
                   pdfThUnit: 'Prix Unitaire',
-                  pdfTotalDue: 'Montant Total à Payer :'
+                  pdfTotalDue: 'Montant Total à Payer :',
+                  pdfSign: 'Cachet et Signature de la Direction',
+                  pdfFooter: 'SME Agri - Société Moulay Ely Pour Agricol | Merci de votre confiance'
                 }
               };
 
@@ -180,18 +192,10 @@ jobs:
 
               let items = [];
               let savedClient = '';
+              let savedCompAddr = localStorage.getItem('sme_comp_addr') || '';
+              let savedCompPhone = localStorage.getItem('sme_comp_phone') || '';
               let savedInvNum = 'INV-' + Math.floor(1000 + Math.random()*9000);
               let savedDate = new Date().toISOString().split('T');
 
               const renderModal = () => {
                 const t = texts[currentLang];
-                const alignStart = t.dir === 'rtl' ? 'right' : 'left';
-                const alignEnd = t.dir === 'rtl' ? 'left' : 'right';
-
-                modal.style.direction = t.dir;
-                modal.innerHTML = `
-                  <div style="background:#fff; border-radius:16px; max-width:500px; margin:20px auto; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.3); color:#1e293b;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #1a3622; padding-bottom:10px; margin-bottom:15px;">
-                      <h3 style="margin:0; color:#1a3622; font-size:17px;">${t.title}</h3>
-                      <div style="display:flex; gap:6px;">
-                        <button id="toggleInvLang" style="background:#1a3622; color:#fff; border:none; border-radius:8px; padding:5px 10px; font-size:12px; font-weight:bold; cursor:pointer;">${t.langSwitch}</button>
