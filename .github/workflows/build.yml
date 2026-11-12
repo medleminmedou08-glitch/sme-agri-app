@@ -17,6 +17,10 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Prepare Web Assets
+        run: |
+          mkdir -p www
+          cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
       - name: Install Capacitor and Plugins
         run: |
           npm install
