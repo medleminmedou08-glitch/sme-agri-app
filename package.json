@@ -6,6 +6,6 @@
     "@capacitor/cli": "6.1.2",
     "@capacitor/core": "6.1.2",
     "@capacitor/geolocation": "6.0.1",
-    "@aparajita/capacitor-biometric-auth": "7.0.1"
+    "capacitor-native-biometric": "^4.2.2"
   }
 }
