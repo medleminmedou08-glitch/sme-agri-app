@@ -17,12 +17,11 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Prepare Web Assets, Biometrics, PDF and Company Invoicing
+      - name: Prepare Web Assets and Modules
         run: |
           mkdir -p www
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
 
-          # 1. جسر البصمة وحفظ الملفات
           cat << 'EOF' > www/bio-bridge.js
           (function() {
             const callNativeBiometric = async (reasonText) => {
@@ -79,7 +78,7 @@ jobs:
                 const blob = await res.blob();
                 const base64Data = await new Promise((resolve) => {
                   const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result.split(','));
+                  reader.onloadend = () => resolve(reader.result.split(',')[1]);
                   reader.readAsDataURL(blob);
                 });
                 const cleanName = filename || ('SME-Agri-' + Date.now() + '.pdf');
@@ -99,7 +98,6 @@ jobs:
           })();
           EOF
 
-          # 2. وحدة الفوترة ثنائية اللغة مع معلومات الشركة الكاملة
           cat << 'EOF' > www/invoicing-module.js
           (function() {
             window.addEventListener('DOMContentLoaded', () => {
@@ -110,8 +108,7 @@ jobs:
                   btnFloat: '🧾 الفوترة',
                   title: '🧾 إنشاء وتصدير فاتورة',
                   langSwitch: 'Français 🇫🇷',
-                  compInfoTitle: 'بيانات الشركة في الفاتورة:',
-                  compAddrPh: 'العنوان (مثال: كرمسين، ولاية اترارزة، موريتانيا)',
+                  compAddrPh: 'العنوان (كرمسين، ولاية اترارزة، موريتانيا)',
                   compPhonePh: 'هاتف الشركة / السجل التجاري',
                   defaultAddr: 'كرمسين، ولاية اترارزة - موريتانيا',
                   clientLabel: 'اسم العميل / المشتري:',
@@ -147,8 +144,7 @@ jobs:
                   btnFloat: '🧾 Facturation',
                   title: '🧾 Créer et Exporter Facture',
                   langSwitch: 'العربية 🇸🇦',
-                  compInfoTitle: 'Informations de l’entreprise :',
-                  compAddrPh: 'Adresse (Ex: Keur Macène, Trarza, Mauritanie)',
+                  compAddrPh: 'Adresse (Keur Macène, Trarza, Mauritanie)',
                   compPhonePh: 'Téléphone / NIF / RC',
                   defaultAddr: 'Keur Macène, Wilaya du Trarza - Mauritanie',
                   clientLabel: 'Nom du Client / Acheteur :',
@@ -195,7 +191,12 @@ jobs:
               let savedCompAddr = localStorage.getItem('sme_comp_addr') || '';
               let savedCompPhone = localStorage.getItem('sme_comp_phone') || '';
               let savedInvNum = 'INV-' + Math.floor(1000 + Math.random()*9000);
-              let savedDate = new Date().toISOString().split('T');
+              let savedDate = new Date().toISOString().split('T')[0];
 
               const renderModal = () => {
                 const t = texts[currentLang];
+                const alignStart = t.dir === 'rtl' ? 'right' : 'left';
+                const alignEnd = t.dir === 'rtl' ? 'left' : 'right';
+
+                modal.style.direction = t.dir;
+                modal.innerHTML = `
