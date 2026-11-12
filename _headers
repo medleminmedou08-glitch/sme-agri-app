@@ -1,0 +1,3 @@
+/*
+  Permissions-Policy: geolocation=(self), publickey-credentials-get=(self), publickey-credentials-create=(self)
+  X-Content-Type-Options: nosniff
