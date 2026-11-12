@@ -17,13 +17,37 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Prepare Web Assets and Logo
+      - name: Prepare Web Assets, Logo and Biometrics Bridge
         run: |
           mkdir -p www assets
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
           cp icon-512.png assets/icon-only.png 2>/dev/null || true
           cp icon-512.png assets/icon-foreground.png 2>/dev/null || true
           cp icon-512.png assets/splash.png 2>/dev/null || true
+          cat << 'EOF' > www/bio-bridge.js
+          (function() {
+            const bridge = {
+              create: async (opts) => {
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BiometricAuth) {
+                  await window.Capacitor.Plugins.BiometricAuth.authenticate({ reason: 'تسجيل بصمة العامل' });
+                  return { id: 'cap-bio-' + Date.now(), rawId: new Uint8Array([1,2,3,4]).buffer, type: 'public-key', response: {} };
+                }
+                throw new Error('Not supported');
+              },
+              get: async (opts) => {
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BiometricAuth) {
+                  await window.Capacitor.Plugins.BiometricAuth.authenticate({ reason: 'تأكيد الحضور والانصراف بالبصمة' });
+                  return { id: 'cap-bio-auth', rawId: new Uint8Array([1,2,3,4]).buffer, type: 'public-key', response: {} };
+                }
+                throw new Error('Not supported');
+              }
+            };
+            if (!window.PublicKeyCredential) { window.PublicKeyCredential = function(){}; }
+            window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = async () => true;
+            try { Object.defineProperty(navigator, 'credentials', { value: bridge, configurable: true }); } catch(e) {}
+          })();
+          EOF
+          sed -i 's/<head>/<head><script src="bio-bridge.js"><\/script>/' www/index.html
       - name: Install Capacitor and Generate Icons
         run: |
           npm install
