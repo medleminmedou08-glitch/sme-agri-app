@@ -63,28 +63,6 @@ jobs:
                 return false;
               }
             };
-            const saveNativeFile = async (url, filename) => {
-              try {
-                const res = await fetch(url);
-                const blob = await res.blob();
-                const base64Data = await new Promise((resolve) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result.split(','));
-                  reader.readAsDataURL(blob);
-                });
-                const cleanName = filename || ('SME-Agri-' + Date.now() + '.pdf');
-                return await window.saveNativeBase64File(base64Data, cleanName);
-              } catch (err) {
-                return false;
-              }
-            };
-            document.addEventListener('click', (e) => {
-              const a = e.target.closest('a');
-              if (a && a.href && (a.hasAttribute('download') || a.href.startsWith('blob:') || a.href.startsWith('data:'))) {
-                e.preventDefault();
-                saveNativeFile(a.href, a.getAttribute('download'));
-              }
-            }, true);
           })();
           EOF
           sed -i 's/<\/body>/<script src="https:\/\/://cloudflare.com\/ajax\/libs\/html2pdf.js\/0.10.1\/html2pdf.bundle.min.js"><\/script><script src="bio-bridge.js"><\/script><script src="invoicing.js"><\/script><script src="ai-assistant.js"><\/script><\/body>/' www/index.html
