@@ -17,7 +17,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Prepare Web Assets and Inject Scripts Directly
+      - name: Prepare Web Assets and Inject All Modules
         run: |
           mkdir -p www
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
@@ -25,6 +25,7 @@ jobs:
           echo '<script src="https://cloudflare.com"></script>' >> www/index.html
           for f in bio-bridge.js invoicing.js ai-assistant.js pro-upgrade.js fertilizer-pro.js fields-map.js sme-dock.js; do
             if [ -f "$f" ]; then
+              echo "Injecting $f..."
               echo "<script>" >> www/index.html
               cat "$f" >> www/index.html
               echo "</script>" >> www/index.html
