@@ -23,7 +23,7 @@ jobs:
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
           rm -f www/sw.js
           echo '<script src="https://cloudflare.com"></script>' >> www/index.html
-          for f in bio-bridge.js invoicing.js ai-assistant.js pro-upgrade.js fertilizer-pro.js fields-map.js; do
+          for f in bio-bridge.js invoicing.js ai-assistant.js pro-upgrade.js fertilizer-pro.js fields-map.js sme-dock.js; do
             if [ -f "$f" ]; then
               echo "<script>" >> www/index.html
               cat "$f" >> www/index.html
