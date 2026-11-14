@@ -17,25 +17,19 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Prepare Web Assets and All Pro Modules
+      - name: Prepare Web Assets and Inject Scripts Directly
         run: |
           mkdir -p www
           cp *.html *.png *.webmanifest *.js *.txt _headers www/ 2>/dev/null || true
-          node -e '
-            const fs = require("fs");
-            let html = fs.readFileSync("www/index.html", "utf8");
-            const scripts = [
-              "https://cloudflare.com",
-              "bio-bridge.js",
-              "invoicing.js",
-              "ai-assistant.js",
-              "pro-upgrade.js",
-              "fertilizer-pro.js",
-              "fields-map.js"
-            ].map(s => `<script src="${s}"></script>`).join("\n");
-            html = html.includes("</body>") ? html.replace("</body>", scripts + "\n</body>") : html + "\n" + scripts;
-            fs.writeFileSync("www/index.html", html);
-          '
+          rm -f www/sw.js
+          echo '<script src="https://cloudflare.com"></script>' >> www/index.html
+          for f in bio-bridge.js invoicing.js ai-assistant.js pro-upgrade.js fertilizer-pro.js fields-map.js; do
+            if [ -f "$f" ]; then
+              echo "<script>" >> www/index.html
+              cat "$f" >> www/index.html
+              echo "</script>" >> www/index.html
+            fi
+          done
       - name: Install Capacitor and Add Android
         run: |
           npm install --legacy-peer-deps
